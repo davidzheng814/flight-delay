@@ -19,7 +19,7 @@ def is_valid_flight(x, start_window):
 
     return True
 
-def load_data(nrows=5000):
+def load_data(nrows=30000):
     return pd.read_csv('flights.csv', nrows=nrows)
 
 def load_graph(flights, year, month, day, hour):
@@ -37,15 +37,23 @@ def load_graph(flights, year, month, day, hour):
         columns={'DEPARTURE_DELAY mean': 'MEAN_DELAY', 'DEPARTURE_DELAY count': 'COUNT'})
 
     G = nx.from_pandas_dataframe(
-        delay_avgs, 'ORIGIN_AIRPORT', 'DESTINATION_AIRPORT', edge_attr=['MEAN_DELAY', 'COUNT'])
+        delay_avgs, 'ORIGIN_AIRPORT', 'DESTINATION_AIRPORT', edge_attr=['MEAN_DELAY', 'COUNT'],
+        create_using=nx.DiGraph())
 
     return G
 
 def get_stats(G, node):
-    for x in G.degree_iter(weight='COUNT'):
-        print x
+    in_airports = G.in_degree(node)
+    out_airports = G.out_degree(node)
+    in_flights = G.in_degree(node, weight='COUNT')
+    out_flights = G.out_degree(node, weight='COUNT')
+
+    betweenness = nx.betweenness_centrality(G)[node]
+
+    return in_airports, out_airports, in_flights, out_flights, betweenness
 
 flights = load_data()
 G = load_graph(flights, 2015, 1, 1, 5)
 
-print get_stats(G)
+print get_stats(G, 'LAX')
+
