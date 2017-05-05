@@ -52,8 +52,23 @@ def get_stats(G, node):
 
     return in_airports, out_airports, in_flights, out_flights, betweenness
 
+def get_correlation(G): 
+    adj = nx.adjacency_matrix(G) 
+    col = adj.shape[1]
+
+    # need to do the math by hand because the matrix is sparse and numpy yells at you 
+    C = ((adj.T*adj -(sum(adj).T*sum(adj)/col))/(col-1)).todense()
+    V = np.sqrt(np.mat(np.diag(C)).T*np.mat(np.diag(C)))
+    epsilon = 1e-119
+    
+    cov_matrix = np.divide(C, V+epsilon)
+
+    return cov_matrix
+
 flights = load_data()
 G = load_graph(flights, 2015, 1, 1, 5)
 
-print get_stats(G, 'LAX')
+# print get_stats(G, 'LAX') 
 
+# test get_correlation
+print get_correlation(G) 
