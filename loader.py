@@ -5,9 +5,14 @@ import datetime
 import math
 
 #TODO FIX TIME ZONES
+#TODO add katz
 
-def load_data(nrows=30000):
-    flights = pd.read_csv('flights.csv', nrows=nrows)
+def load_data(nrows=None):
+    if nrows:
+        flights = pd.read_csv('flights.csv', nrows=nrows)
+    else:
+        flights = pd.read_csv('flights.csv')
+
     flights = flights[flights['DEPARTURE_DELAY'].notnull()]
     return flights
 
@@ -74,7 +79,7 @@ def load_graph(flights, year, month, day, hour):
 
     return G
 
-def get_feature_vectors(G, year, month, day, hour):
+def get_feature_vecs(G, year, month, day, hour):
     time = datetime.datetime(year, month, day, hour)
 
     features = {}
@@ -120,6 +125,33 @@ def get_feature_vectors(G, year, month, day, hour):
 
     return features
 
+def save_feature_vecs():
+    # 2015 
+    flights = load_data(nrows=1000)
+    cur_date = datetime.date(2015, 1, 1)
+    end = datetime.date(2016, 1, 1)
+    Xs = {}
+    Ys = {}
+    while cur_date < end:
+        for hour in range(24):
+            G = load_graph(flights, cur_date.year, cur_date.month, cur_date.day, hour)
+            X = get_feature_vecs(G, cur_date.year, cur_date.month, cur_date.day, hour)
+            Y = get_delay_times(flights, cur_date.year, cur_date.month, cur_date.day, hour)
+
+            for airport in X:
+                if airport in Y:
+                    Xs.setdefault(airport, []).append(X[airport])
+                    Ys.setdefault(airport, []).append(Y[airport])
+
+        cur_date += datetime.timedelta(days=1)
+
+    for airport in Xs:
+        Xs[airport] = np.array(Xs[airport])
+        Ys[airport] = np.array(Ys[airport])
+
+    np.savez('X.npz', **Xs)
+    np.savez('Y.npz', **Ys)
+
 def get_correlation(G): 
     adj = nx.adjacency_matrix(G) 
     col = adj.shape[1]
@@ -133,3 +165,5 @@ def get_correlation(G):
 
     return cov_matrix
 
+if __name__ == '__main__':
+    save_feature_vecs()
