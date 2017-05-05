@@ -5,7 +5,6 @@ import datetime
 import math
 
 #TODO FIX TIME ZONES
-# TODO consider edge case of no delay/long period of no delay
 
 def load_data(nrows=30000):
     flights = pd.read_csv('flights.csv', nrows=nrows)
