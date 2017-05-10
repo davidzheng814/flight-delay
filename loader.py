@@ -7,9 +7,9 @@ import math
 #TODO FIX TIME ZONES
 #TODO add katz
 
-def load_data(nrows=None):
+def load_data(skiprows=0, nrows=None):
     if nrows:
-        flights = pd.read_csv('flights.csv', nrows=nrows)
+        flights = pd.read_csv('flights.csv', skiprows=range(1, skiprows), nrows=nrows)
     else:
         flights = pd.read_csv('flights.csv')
 
@@ -114,7 +114,7 @@ def get_feature_vecs(G, year, month, day, hour):
     # katz = nx.katz_centrality(G, alpha=0.01, max_iter=1000)
     # weighted_katz = nx.katz_centrality(G, weight='SUM')
     clustering = nx.clustering(nx.Graph(G))
-    hubs, auth = nx.hits(G)
+    hubs, auth = nx.hits(G, max_iter=500)
 
     for node in G.nodes():
         features[node].extend([betweenness[node], 
@@ -126,31 +126,23 @@ def get_feature_vecs(G, year, month, day, hour):
     return features
 
 def save_feature_vecs():
-    # 2015 
-    flights = load_data(nrows=1000)
-    cur_date = datetime.date(2015, 1, 1)
-    end = datetime.date(2016, 1, 1)
-    Xs = {}
-    Ys = {}
-    while cur_date < end:
+    flights = load_data(skiprows=100000, nrows=100000)
+    cur_date = datetime.date(flights['YEAR'][0], flights['MONTH'][0], flights['DAY'][0])
+    end_date = datetime.date(flights['YEAR'].tail(1), flights['MONTH'].tail(1), flights['DAY'].tail(1))
+    while cur_date < end_date:
+        print cur_date
         for hour in range(24):
+            print hour
             G = load_graph(flights, cur_date.year, cur_date.month, cur_date.day, hour)
             X = get_feature_vecs(G, cur_date.year, cur_date.month, cur_date.day, hour)
             Y = get_delay_times(flights, cur_date.year, cur_date.month, cur_date.day, hour)
 
-            for airport in X:
-                if airport in Y:
-                    Xs.setdefault(airport, []).append(X[airport])
-                    Ys.setdefault(airport, []).append(Y[airport])
+            Y = {airport:Y[airport] for airport in X.keys() if airport in Y}
+
+            np.savez_compressed('data/X_'+str(cur_date)+'_'+str(hour)+'.npz', **X)
+            np.savez_compressed('data/Y_'+str(cur_date)+'_'+str(hour)+'.npz', **Y)
 
         cur_date += datetime.timedelta(days=1)
-
-    for airport in Xs:
-        Xs[airport] = np.array(Xs[airport])
-        Ys[airport] = np.array(Ys[airport])
-
-    np.savez('X.npz', **Xs)
-    np.savez('Y.npz', **Ys)
 
 def get_correlation(G): 
     adj = nx.adjacency_matrix(G) 
