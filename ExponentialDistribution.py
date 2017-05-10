@@ -3,6 +3,7 @@
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve, auc
 
 
 class ExponentialDistribution():
@@ -76,6 +77,28 @@ class ExponentialDistribution():
         return (1 - np.exp(-1.0 * np.multiply(lam_vals, T)))
 
 
+    # @param X, T the test feature vectors and labels (number of hours until the next delay) respectively
+    # @param num_hours the number of ROC curves to make, defaults to 24, representing a single day
+    def makeROCCurvesForTestData(self, X, T, num_hours=5):
+        X = np.array(X)
+        T = np.array(T)
+        plt.figure()
+        for i in xrange(1, num_hours + 1):
+            labels = T >= i # 1 if there is no delay within the next i hours, 0 otherwise
+            probabilities = self.cdf(X, T)
+            fpr, tpr, _ = roc_curve(labels, probabilities)
+            roc_auc = auc(fpr, tpr)
+            plt.plot(fpr, tpr, lw=2, label='Predicting Delays in the next {} hours:'.format(i) + ' AUC (area = %0.2f)' % roc_auc)
+
+        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title("Predicting Delays for the Next {} Hours".format(num_hours))       
+        plt.legend(loc="lower right")
+
+        plt.savefig("./ROCCurvesForDelayPredictionUpTo{}Hours".format(num_hours), format="png")
 
 def TestExponentialEstimation():
     n = 100
@@ -94,6 +117,7 @@ def TestExponentialEstimation():
     print "Final Likelihood:",likelihood_vals[-1]
     print "Final Gradient Norm:",gradient_norm_vals[-1]
 
+    #dist.makeROCCurvesForTestData(fake_X, fake_T)
     plt.figure(1)
     plt.subplot(211)
     plt.plot(iters, likelihood_vals, label="Log Likelihood")
@@ -110,7 +134,7 @@ def TestExponentialEstimation():
     plt.show()
 
 
-TestExponentialEstimation()
+#TestExponentialEstimation()
 
 
 
