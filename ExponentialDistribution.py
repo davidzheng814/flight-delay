@@ -21,6 +21,8 @@ class ExponentialDistribution():
             return
         X = np.array(X)
         T = np.array(T)
+        if T.ndim == 2:
+            T = np.squeeze(T, axis=1)
         self.betas = np.zeros(len(X[0]))
         grad_norm = float("inf")
         num_iter = 0
@@ -28,6 +30,10 @@ class ExponentialDistribution():
         gradient_norm_vals = []
         num_iters_with_decreasing_likelihood = 0
         while grad_norm > tol and num_iter < max_iter:
+            # if num_iter == 100000:
+            #     learning_rate *= 10
+            # if num_iter == 500000:
+            #     learning_rate *= 1000
             likelihood = self.log_likelihood(X, T, regularization)
 
             gradient = self.gradient(X, T, regularization)
@@ -58,7 +64,32 @@ class ExponentialDistribution():
 
     # returns a d by 1 vector
     def gradient(self, X, T, regularization=0):
-        return np.sum(X, axis=0) - X.transpose().dot(np.multiply(np.expand_dims(np.exp(X.dot(self.betas.transpose())), axis=1), T)).sum(axis=0) - 2 * regularization * np.absolute(self.betas).transpose()
+        # print np.expand_dims(np.exp(X.dot(self.betas.transpose())), axis=1).shape
+        #print T.shape
+        # if T.ndim > 1:
+        #     T = np.squeeze(T, axis=1)
+        # print "X:",X.shape
+        # print "T:",T.shape
+        # print "first term:",np.sum(X, axis=0).shape
+        # print np.multiply(np.expand_dims(np.exp(X.dot(self.betas.transpose())), axis=1), T).shape
+        # print X.transpose().dot(np.multiply(np.expand_dims(np.exp(X.dot(self.betas.transpose())), axis=1), T)).shape
+        # print "reg shape:",(2 * regularization * np.absolute(self.betas).transpose()).shape
+        # a = np.sum(X, axis=0)
+        # #b = X.transpose().dot(np.multiply(np.expand_dims(np.exp(X.dot(self.betas.transpose())), axis=1), T))
+        # print "exp shape:",np.exp(X.dot(self.betas.transpose())).shape
+        # print "prod shape:",(np.exp(X.dot(self.betas.transpose())) * T).shape
+        # print "const:",np.multiply(np.exp(X.dot(self.betas.transpose())), np.squeeze(T, axis=1)).shape
+        # b = X.transpose().dot(np.multiply(np.exp(X.dot(self.betas.transpose())), np.squeeze(T, axis=1)))
+        # print "b shape:",b.shape
+        # print "a:",a
+        # print "b: ",b
+        # print "a - b:",(a - b)
+        #return np.sum(X, axis=0) - X.transpose().dot(np.multiply(np.expand_dims(np.exp(X.dot(self.betas.transpose())), axis=1), T)).sum(axis=0) - 2 * regularization * np.absolute(self.betas).transpose()
+        return np.sum(X, axis=0) - X.transpose().dot(np.multiply(np.exp(X.dot(self.betas.transpose())), T)) - 2 * regularization * np.absolute(self.betas).transpose()
+        #print "Return shape:",(np.sum(X, axis=0) - X.transpose().dot(np.multiply(np.expand_dims(np.exp(X.dot(self.betas.transpose())), axis=1), T))).shape
+        #return np.sum(X, axis=0).expand_dims(axis=1) - X.transpose().dot(np.multiply(np.exp(X.dot(self.betas.transpose())), T))
+
+        #sys.exit(0)
 
     # returns an n by 1 vector
     def pdf(self, X, T):
@@ -72,8 +103,8 @@ class ExponentialDistribution():
     def cdf(self, X, T):
         X = np.array(X)
         T = np.array(T)
-
-        lam_vals = np.expand_dims(np.exp(X.dot(self.betas.transpose())), axis=1)
+        ''' FIX THIS USING SQUEEZE INSTEAD OF EXPAND DIMS'''
+        lam_vals = np.exp(X.dot(self.betas.transpose()))
         return (1 - np.exp(-1.0 * np.multiply(lam_vals, T)))
 
 
@@ -109,11 +140,12 @@ def TestExponentialEstimation():
     dist = ExponentialDistribution()
 
     # set early_stopping to True to stop training at optimal likelihood
-    betas, likelihood_vals, gradient_norm_vals = dist.fit(fake_X, fake_T, regularization=0, early_stopping=False)
+    betas, likelihood_vals, gradient_norm_vals = dist.fit(fake_X, fake_T, regularization=1, early_stopping=False, max_iter=10000)
     iters = range(len(likelihood_vals))
 
     #print "PDF:",dist.pdf(fake_X, fake_T)
     #print "CDF:",dist.cdf(fake_X, fake_T)
+    print "Final Betas:",betas
     print "Final Likelihood:",likelihood_vals[-1]
     print "Final Gradient Norm:",gradient_norm_vals[-1]
 
@@ -134,7 +166,53 @@ def TestExponentialEstimation():
     plt.show()
 
 
+def TestEstimationOnTrainingData():
+    X, T = loadTrainingData()
+    dist = ExponentialDistribution()
+
+    betas, likelihood_vals, gradient_norm_vals = dist.fit(X, T, learning_rate=1e-10, regularization=0, early_stopping=False, max_iter=1000000)
+    iters = range(len(likelihood_vals))
+    print "Final betas:",betas
+    print "Final Likelihood:",likelihood_vals[-1]
+    print "Final Gradient Norm:",gradient_norm_vals[-1]
+
+    dist.makeROCCurvesForTestData(X, T)
+    # plt.figure(1)
+    # plt.subplot(211)
+    # plt.plot(iters, likelihood_vals, label="Log Likelihood")
+    # #plt.plot(iters, gradient_norm_vals, label="Gradient Norm")
+    # plt.title("Log Likelihood for Estimation with No Regularization")
+    # plt.xlabel("Iteration Number")
+    
+    # plt.subplot(212)
+    # plt.plot(iters, gradient_norm_vals, label="Gradient Norm")
+    # plt.xlabel("Iteration Number")
+    # #plt.ylabel("Value")
+    # plt.title("Gradient Norm for Estimation with No Regularization")
+    # #plt.legend(loc="upper right")
+    # plt.show()
+
+
+def loadTrainingData():
+    f = open("./training_data/X.txt", "r")
+    X = []
+    T = []
+    for line in f:
+        l = [float(x) for x in line.split(',')]
+        X.append(l)
+    f.close()
+    f = open("./training_data/T.txt", "r")
+    for line in f:
+        T.append(float(line))
+    f.close()
+
+    print len(X)
+    print len(T)
+    return X, T
+
 #TestExponentialEstimation()
+TestEstimationOnTrainingData()
+
 
 
 
