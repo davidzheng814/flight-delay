@@ -1,0 +1,2 @@
+Final Likelihood: -6.32484233602e+16
+Final Gradient Norm: 1590577547.44
