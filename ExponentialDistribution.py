@@ -166,6 +166,7 @@ def TestExponentialEstimation():
     plt.show()
 
 
+<<<<<<< Updated upstream
 def TestEstimationOnTrainingData():
     X, T = loadTrainingData()
     dist = ExponentialDistribution()
@@ -210,11 +211,6 @@ def loadTrainingData():
     print len(T)
     return X, T
 
-#TestExponentialEstimation()
-TestEstimationOnTrainingData()
-
-
-
-
-
+if __name__ == '__main__':
+  TestExponentialEstimation()
 
