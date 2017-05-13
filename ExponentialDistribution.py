@@ -1,9 +1,11 @@
 
 
 import sys
+import json
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc
+from sklearn.cross_validation import train_test_split
 
 
 class ExponentialDistribution():
@@ -16,7 +18,7 @@ class ExponentialDistribution():
                 at each iteration of training
         Note: converged with learning_rate=.0000001
     '''
-    def fit(self, X, T, regularization=1, learning_rate=.0000001, early_stopping=True, max_iter=35000, tol=.01):
+    def fit(self, X, T, regularization=1, learning_rate=.0000001, early_stopping=True, max_iter=35000, tol=.00001):
         if len(X) == 0:
             return
         X = np.array(X)
@@ -30,8 +32,9 @@ class ExponentialDistribution():
         gradient_norm_vals = []
         num_iters_with_decreasing_likelihood = 0
         while grad_norm > tol and num_iter < max_iter:
-            # if num_iter == 100000:
-            #     learning_rate *= 10
+            if num_iter == 1000000:
+                learning_rate *= 10
+                print "did this"
             # if num_iter == 500000:
             #     learning_rate *= 1000
             likelihood = self.log_likelihood(X, T, regularization)
@@ -108,87 +111,121 @@ class ExponentialDistribution():
         return (1 - np.exp(-1.0 * np.multiply(lam_vals, T)))
 
 
+    def setBetas(self, betas):
+        self.betas = np.array(betas)
+
     # @param X, T the test feature vectors and labels (number of hours until the next delay) respectively
     # @param num_hours the number of ROC curves to make, defaults to 24, representing a single day
-    def makeROCCurvesForTestData(self, X, T, num_hours=5):
+    def makeROCCurvesForTestData(self, X, T, num_hours_start=5, num_hours_end=10):
         X = np.array(X)
         T = np.array(T)
         plt.figure()
-        for i in xrange(1, num_hours + 1):
+        for i in xrange(num_hours_start, num_hours_end + 1):
             labels = T >= i # 1 if there is no delay within the next i hours, 0 otherwise
             probabilities = self.cdf(X, T)
             fpr, tpr, _ = roc_curve(labels, probabilities)
             roc_auc = auc(fpr, tpr)
-            plt.plot(fpr, tpr, lw=2, label='Predicting Delays in the next {} hours:'.format(i) + ' AUC (area = %0.2f)' % roc_auc)
+            plt.plot(fpr, tpr, lw=2, label='Delay Prediction for next {} hours:'.format(i) + ' AUC (area = %0.2f)' % roc_auc)
 
         plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
         plt.xlim([0.0, 1.0])
         plt.ylim([0.0, 1.05])
         plt.xlabel('False Positive Rate')
         plt.ylabel('True Positive Rate')
-        plt.title("Predicting Delays for the Next {} Hours".format(num_hours))       
+        plt.title("ROC Curves for Predicting Delays Between the Next {} and {} Hours".format(num_hours_start, num_hours_end))       
         plt.legend(loc="lower right")
 
-        plt.savefig("./ROCCurvesForDelayPredictionUpTo{}Hours".format(num_hours), format="png")
+        plt.savefig("./ROCCurvesForDelayPredictionBetween{}and{}HoursStandardizedData_Reg10".format(num_hours_start, num_hours_end), format="png")
 
-def TestExponentialEstimation():
-    n = 100
-    d = 15
-    fake_X = np.random.randint(0, 2, size=(n, d))
-    fake_T = np.random.randint(1, 10, size=(n, 1))
+# def TestExponentialEstimation():
+#     n = 100
+#     d = 15
+#     fake_X = np.random.randint(0, 2, size=(n, d))
+#     fake_T = np.random.randint(1, 10, size=(n, 1))
 
-    dist = ExponentialDistribution()
+#     dist = ExponentialDistribution()
 
-    # set early_stopping to True to stop training at optimal likelihood
-    betas, likelihood_vals, gradient_norm_vals = dist.fit(fake_X, fake_T, regularization=1, early_stopping=False, max_iter=10000)
-    iters = range(len(likelihood_vals))
+#     # set early_stopping to True to stop training at optimal likelihood
+#     betas, likelihood_vals, gradient_norm_vals = dist.fit(fake_X, fake_T, regularization=1, early_stopping=False, max_iter=10000)
+#     iters = range(len(likelihood_vals))
 
-    #print "PDF:",dist.pdf(fake_X, fake_T)
-    #print "CDF:",dist.cdf(fake_X, fake_T)
-    print "Final Betas:",betas
-    print "Final Likelihood:",likelihood_vals[-1]
-    print "Final Gradient Norm:",gradient_norm_vals[-1]
+#     #print "PDF:",dist.pdf(fake_X, fake_T)
+#     #print "CDF:",dist.cdf(fake_X, fake_T)
+#     print "Final Betas:",betas
+#     print "Final Likelihood:",likelihood_vals[-1]
+#     print "Final Gradient Norm:",gradient_norm_vals[-1]
 
-    #dist.makeROCCurvesForTestData(fake_X, fake_T)
-    plt.figure(1)
-    plt.subplot(211)
-    plt.plot(iters, likelihood_vals, label="Log Likelihood")
-    #plt.plot(iters, gradient_norm_vals, label="Gradient Norm")
-    plt.title("Log Likelihood for Estimation with No Regularization")
-    plt.xlabel("Iteration Number")
+#     #dist.makeROCCurvesForTestData(fake_X, fake_T)
+#     plt.figure(1)
+#     plt.subplot(211)
+#     plt.plot(iters, likelihood_vals, label="Log Likelihood")
+#     #plt.plot(iters, gradient_norm_vals, label="Gradient Norm")
+#     plt.title("Log Likelihood for Estimation with No Regularization")
+#     plt.xlabel("Iteration Number")
     
-    plt.subplot(212)
-    plt.plot(iters, gradient_norm_vals, label="Gradient Norm")
-    plt.xlabel("Iteration Number")
-    #plt.ylabel("Value")
-    plt.title("Gradient Norm for Estimation with No Regularization")
-    #plt.legend(loc="upper right")
-    plt.show()
+#     plt.subplot(212)
+#     plt.plot(iters, gradient_norm_vals, label="Gradient Norm")
+#     plt.xlabel("Iteration Number")
+#     #plt.ylabel("Value")
+#     plt.title("Gradient Norm for Estimation with No Regularization")
+#     #plt.legend(loc="upper right")
+#     plt.show()
 
 
 def TestEstimationOnTrainingData():
     X, T = loadTrainingData()
+    X = (X - np.mean(X, axis=0)) / (np.std(X, axis=0) + 1e-11)
+    #print np.max(X)
+    #sys.exit(0)
+    X_train, X_test, T_train, T_test = train_test_split(X, T, test_size=.2)
     dist = ExponentialDistribution()
 
-    betas, likelihood_vals, gradient_norm_vals = dist.fit(X, T, learning_rate=1e-10, regularization=0, early_stopping=False, max_iter=1000000)
-    iters = range(len(likelihood_vals))
-    print "Final betas:",betas
-    print "Final Likelihood:",likelihood_vals[-1]
-    print "Final Gradient Norm:",gradient_norm_vals[-1]
+    # betas, likelihood_vals, gradient_norm_vals = dist.fit(X_train, T_train, learning_rate=1e-6, regularization=10, early_stopping=False, max_iter=1000000)
+    # iters = range(len(likelihood_vals))
+    # print "Final betas:",betas
+    # print "Final Likelihood:",likelihood_vals[-1]
+    # print "Final Gradient Norm:",gradient_norm_vals[-1]
+    # f = open("FinalBetasStandardizedDataReg10.json", "w")
+    # json.dump(betas.tolist(), f)
+    # f.close()
 
-    dist.makeROCCurvesForTestData(X, T)
+    # f = open("FinalLikelihoodAndGradStandardizedDataReg10.json", "w")
+    # json.dump([likelihood_vals, gradient_norm_vals], f)
+    # f.close()
+
+    # f = open("FinalBetasStandardizedData.json", "r")
+    # betas = json.load(f)
+    # f.close()
+    # dist.setBetas(betas)
+    # dist.makeROCCurvesForTestData(X_test, T_test, num_hours_start=4, num_hours_end=5)
+    # dist.makeROCCurvesForTestData(X_test, T_test, num_hours_start=6, num_hours_end=9)
+    # dist.makeROCCurvesForTestData(X_test, T_test, num_hours_start=10, num_hours_end=13)
+    # dist.makeROCCurvesForTestData(X_test, T_test, num_hours_start=14, num_hours_end=17)
+    # dist.makeROCCurvesForTestData(X_test, T_test, num_hours_start=17, num_hours_end=20)
+    # dist.makeROCCurvesForTestData(X_test, T_test, num_hours_start=21, num_hours_end=24)
+
+    # f = open("./FinalLikelihoodAndGradStandardizedDataReg10.json", "r")
+    # vals = json.load(f)
+    # iters = range(len(vals[0]))
+    # f.close()
+    # likelihood_vals = vals[0]
+    # gradient_norm_vals = vals[1]
+
+
     # plt.figure(1)
-    # plt.subplot(211)
-    # plt.plot(iters, likelihood_vals, label="Log Likelihood")
-    # #plt.plot(iters, gradient_norm_vals, label="Gradient Norm")
-    # plt.title("Log Likelihood for Estimation with No Regularization")
-    # plt.xlabel("Iteration Number")
+    # # # plt.subplot(211)
+    # # plt.plot(iters, likelihood_vals, label="Log Likelihood")
+    # # #plt.plot(iters, gradient_norm_vals, label="Gradient Norm")
+    # # plt.title("Log Likelihood for Estimation with Regularization = 10")
+    # # plt.xlabel("Iteration Number")
+    # # plt.show()
+    # # sys.exit(0)
     
-    # plt.subplot(212)
+    # # #plt.subplot(212)
     # plt.plot(iters, gradient_norm_vals, label="Gradient Norm")
     # plt.xlabel("Iteration Number")
     # #plt.ylabel("Value")
-    # plt.title("Gradient Norm for Estimation with No Regularization")
+    # plt.title("Gradient Norm for Estimation with Regularization = 10")
     # #plt.legend(loc="upper right")
     # plt.show()
 
