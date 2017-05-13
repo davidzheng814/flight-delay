@@ -172,6 +172,7 @@ class ExponentialDistribution():
 #     plt.show()
 
 
+<<<<<<< Updated upstream
 def TestEstimationOnTrainingData():
     X, T = loadTrainingData()
     X = (X - np.mean(X, axis=0)) / (np.std(X, axis=0) + 1e-11)
@@ -247,11 +248,6 @@ def loadTrainingData():
     print len(T)
     return X, T
 
-#TestExponentialEstimation()
-TestEstimationOnTrainingData()
-
-
-
-
-
+if __name__ == '__main__':
+  TestExponentialEstimation()
 

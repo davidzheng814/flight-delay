@@ -4,8 +4,8 @@ import networkx as nx
 import datetime
 import math
 
-#TODO FIX TIME ZONES
-#TODO add katz
+# TODO FIX TIME ZONES
+# TODO add katz
 
 def load_data(skiprows=0, nrows=None):
     if nrows:
@@ -14,11 +14,19 @@ def load_data(skiprows=0, nrows=None):
         flights = pd.read_csv('flights.csv')
 
     flights = flights[flights['DEPARTURE_DELAY'].notnull()]
+    flights = flights[flights['SCHEDULED_TIME'].notnull()]
+    flights.reset_index(inplace=True)
     return flights
 
-def row_to_dt(x, depart=True):
+def row_to_dt(x, depart=True, scheduled=True):
     col = 'SCHEDULED_DEPARTURE' if depart else 'SCHEDULED_ARRIVAL'
-    return datetime.datetime(x['YEAR'], x['MONTH'], x['DAY'], x[col]/100, x[col]%100)
+    time = int(x[col])
+    time = datetime.datetime(x['YEAR'], x['MONTH'], x['DAY'], time/100, time%100)
+
+    if not scheduled and depart:
+        time += datetime.timedelta(minutes=x['DEPARTURE_DELAY'])
+
+    return time
 
 def get_delay_times(flights, year, month, day, hour, min_delay=60):
     def is_valid_flight(x, start_dt):
@@ -26,7 +34,7 @@ def get_delay_times(flights, year, month, day, hour, min_delay=60):
             len(str(x['DESTINATION_AIRPORT'])) != 3):
             return False
 
-        dep_dt = row_to_dt(x, depart=True)
+        dep_dt = row_to_dt(x)
         if dep_dt > start_dt and x['DEPARTURE_DELAY'] >= min_delay:
             return True
 
@@ -36,7 +44,7 @@ def get_delay_times(flights, year, month, day, hour, min_delay=60):
     start_dt = datetime.datetime(year, month, day, hour) + datetime.timedelta(hours=1)
 
     flights = flights[flights.apply(lambda x: is_valid_flight(x, start_dt), axis=1)]
-    flights['TIMES'] = flights.apply(lambda x: (row_to_dt(x) - start_dt).seconds/60 + 1, axis=1)
+    flights['TIMES'] = flights.apply(lambda x: (row_to_dt(x) - start_dt).total_seconds()/60 + 1, axis=1)
     flights = flights[['ORIGIN_AIRPORT', 'TIMES']]
     flights = flights.groupby('ORIGIN_AIRPORT').min().reset_index()
 
@@ -125,8 +133,8 @@ def get_feature_vecs(G, year, month, day, hour):
 
     return features
 
-def save_feature_vecs():
-    flights = load_data(skiprows=100000, nrows=100000)
+def save_feature_vecs(ind):
+    flights = load_data(skiprows=ind, nrows=100000)
     cur_date = datetime.date(flights['YEAR'][0], flights['MONTH'][0], flights['DAY'][0])
     end_date = datetime.date(flights['YEAR'].tail(1), flights['MONTH'].tail(1), flights['DAY'].tail(1))
     while cur_date < end_date:
@@ -139,8 +147,8 @@ def save_feature_vecs():
 
             Y = {airport:Y[airport] for airport in X.keys() if airport in Y}
 
-            np.savez_compressed('data/X_'+str(cur_date)+'_'+str(hour)+'.npz', **X)
-            np.savez_compressed('data/Y_'+str(cur_date)+'_'+str(hour)+'.npz', **Y)
+            np.savez_compressed('data2/X_'+str(cur_date)+'_'+str(hour)+'.npz', **X)
+            np.savez_compressed('data2/Y_'+str(cur_date)+'_'+str(hour)+'.npz', **Y)
 
         cur_date += datetime.timedelta(days=1)
 
@@ -158,4 +166,5 @@ def get_correlation(G):
     return cov_matrix
 
 if __name__ == '__main__':
-    save_feature_vecs()
+    for ind in range(0, 11):
+        save_feature_vecs(ind * 100000)
